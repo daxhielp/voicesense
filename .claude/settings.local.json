@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//c/Users/daxpe/School/CS/Projects/ser/**)",
+      "Read(//c/Users/daxpe/School/CS/Projects/**)",
+      "Bash(find:*)",
+      "Bash(awk '{print $5, $9}')",
+      "Bash(npm install:*)",
+      "Bash(npm run:*)",
+      "Bash(npm outdated:*)",
+      "Bash(npm show:*)",
+      "Bash(pip index:*)",
+      "Bash(pip show:*)",
+      "Bash(python -c \"import urllib.request, json; data=json.loads\\(urllib.request.urlopen\\('https://pypi.org/pypi/librosa/0.11.0/json'\\).read\\(\\)\\); notes=data['info']['description'][:3000]; print\\(notes\\)\")"
+    ]
+  }
+}
