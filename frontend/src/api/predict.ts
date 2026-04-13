@@ -12,7 +12,7 @@ export interface PredictionResult {
  * In production VITE_API_URL is set to the Render backend URL.
  * In local dev it falls back to '/api', which Vite proxies to localhost:8000.
  */
-const API_BASE = import.meta.env.VITE_API_URL ?? '/api'
+export const API_BASE = import.meta.env.VITE_API_URL ?? '/api'
 
 export async function predictEmotion(audioBlob: Blob): Promise<PredictionResult> {
   const formData = new FormData()
@@ -24,7 +24,7 @@ export async function predictEmotion(audioBlob: Blob): Promise<PredictionResult>
     formData,
     {
       headers: { 'Content-Type': 'multipart/form-data' },
-      timeout: 30_000, // 30s — free-tier cold start can be slow
+      timeout: 180_000, // 3 min — Render free tier shared CPU can be slow
     },
   )
   return response.data

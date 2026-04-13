@@ -1,15 +1,23 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
+import axios from 'axios'
 import { ParticleBackground }  from './components/ParticleBackground'
 import { IdleView }            from './components/IdleView'
 import { RecordingView }       from './components/RecordingView'
 import { ResultView }          from './components/ResultView'
+import { ErrorView }           from './components/ErrorView'
 import { useAudioRecorder }    from './hooks/useAudioRecorder'
-import { predictEmotion, type PredictionResult } from './api/predict'
+import { predictEmotion, API_BASE, type PredictionResult } from './api/predict'
 
-type AppState = 'idle' | 'recording' | 'processing' | 'result'
+type AppState = 'idle' | 'recording' | 'processing' | 'result' | 'error'
 
-function ProcessingView() {
+function ProcessingView({ elapsedSeconds }: { elapsedSeconds: number }) {
+  const message =
+    elapsedSeconds < 5  ? 'Analyzing your voice...'           :
+    elapsedSeconds < 12 ? 'Processing audio...'               :
+    elapsedSeconds < 20 ? 'Server warming up, please wait...' :
+                          'Almost there...'
+
   return (
     <motion.div
       className="flex flex-col items-center gap-5 py-10"
@@ -32,17 +40,40 @@ function ProcessingView() {
           transition={{ duration: 1, repeat: Infinity }}
         />
       </div>
-      <p className="text-slate-400 text-sm tracking-wide">Analyzing your voice...</p>
+      <p className="text-slate-400 text-sm tracking-wide">{message}</p>
+      {elapsedSeconds >= 20 && (
+        <p className="text-slate-600 text-xs">{elapsedSeconds}s elapsed</p>
+      )}
     </motion.div>
   )
 }
 
 export default function App() {
-  const [appState, setAppState] = useState<AppState>('idle')
-  const [result,   setResult]   = useState<PredictionResult | null>(null)
-  const [error,    setError]    = useState<string | null>(null)
+  const [appState,       setAppState]       = useState<AppState>('idle')
+  const [result,         setResult]         = useState<PredictionResult | null>(null)
+  const [error,          setError]          = useState<string | null>(null)
+  const [processingTime, setProcessingTime] = useState(0)
 
   const { startRecording, stopRecording, analyserNode } = useAudioRecorder()
+
+  // ── Keep-alive: ping /health on mount + every 4 min to prevent Render cold starts ──
+  useEffect(() => {
+    const ping = () =>
+      fetch(`${API_BASE}/health`, { method: 'GET' }).catch(() => {})
+    ping()
+    const id = setInterval(ping, 4 * 60 * 1000)
+    return () => clearInterval(id)
+  }, [])
+
+  // ── Processing timer: count seconds while waiting for prediction ──────────────
+  useEffect(() => {
+    if (appState !== 'processing') {
+      setProcessingTime(0)
+      return
+    }
+    const id = setInterval(() => setProcessingTime(t => t + 1), 1000)
+    return () => clearInterval(id)
+  }, [appState])
 
   const handleStart = useCallback(async () => {
     setError(null)
@@ -63,9 +94,18 @@ export default function App() {
       setResult(prediction)
       setAppState('result')
     } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Prediction failed — please try again.'
+      let msg = 'Prediction failed — please try again.'
+      if (axios.isAxiosError(err)) {
+        if (err.code === 'ECONNABORTED') {
+          msg = 'The server is warming up after a period of inactivity. This can take up to 60 seconds on first load — please try again.'
+        } else if (!err.response) {
+          msg = 'Could not reach the server. Please check your connection and try again.'
+        } else if (err.response.status >= 500) {
+          msg = `Server error (${err.response.status}). Please try again in a moment.`
+        }
+      }
       setError(msg)
-      setAppState('idle')
+      setAppState('error')
     }
   }, [stopRecording])
 
@@ -112,10 +152,13 @@ export default function App() {
               <RecordingView key="recording" analyserNode={analyserNode} onStop={handleStop} />
             )}
             {appState === 'processing' && (
-              <ProcessingView key="processing" />
+              <ProcessingView key="processing" elapsedSeconds={processingTime} />
             )}
             {appState === 'result' && result && (
               <ResultView key="result" result={result} onReset={handleReset} />
+            )}
+            {appState === 'error' && (
+              <ErrorView key="error" message={error ?? 'Something went wrong.'} onRetry={handleReset} />
             )}
           </AnimatePresence>
         </motion.main>

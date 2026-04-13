@@ -5,26 +5,26 @@
 See: .paul/PROJECT.md (updated 2026-04-13)
 
 **Core value:** Users speak and get instant emotion feedback — showcases end-to-end ML deployment
-**Current focus:** v1.1 Performance & Infrastructure milestone
+**Current focus:** v1.1 milestone complete — ready for Render deploy or next milestone
 
 ## Current Position
 
-Milestone: v1.1 Performance & Infrastructure
-Phase: 2 of 3 (Preprocessing Optimization) — Complete
-Plan: 02-02 complete
-Status: Phase 2 done — ready to plan Phase 3
-Last activity: 2026-04-13 — UNIFY complete, 02-02-SUMMARY.md created
+Milestone: v1.1 Performance & Infrastructure — **COMPLETE**
+Phase: 3 of 3 (Cold-Start UX) — Complete
+Plan: 03-01 — Complete
+Status: Milestone complete, ready for deploy or next planning
+Last activity: 2026-04-13 — Phase 3 complete, v1.1 milestone unified
 
 Progress:
-- Milestone: [██████░░░░] 67%
-- Phase 2:   [██████████] 100%
+- Milestone: [██████████] 100%
+- Phase 3:   [██████████] 100%
 
 ## Loop Position
 
 Current loop state:
 ```
 PLAN ──▶ APPLY ──▶ UNIFY
-  ✓        ✓        ✓     [Loop complete — ready for next PLAN]
+  ✓        ✓        ✓     [Loop complete — milestone complete]
 ```
 
 ## Accumulated Context
@@ -36,6 +36,8 @@ PLAN ──▶ APPLY ──▶ UNIFY
 | Keep librosa for mel spec | Phase 1 | Matches training exactly; step 3 is now dominant at ~1.2s |
 | soundfile + resample_poly | Phase 2 | Step 2: 27,999ms → 3.5ms; total: 29,639ms → 1,250ms locally |
 | Accept ONNX two-file format | Phase 1 | Dockerfile COPYs both .onnx + .onnx.data |
+| fetch (not axios) for keep-alive | Phase 3 | Minimal ping code; failures silently swallowed |
+| error AppState distinct from idle | Phase 3 | User reads error before re-recording; honest cold-start UX |
 
 ### Deferred Issues
 
@@ -48,12 +50,17 @@ PLAN ──▶ APPLY ──▶ UNIFY
 
 None.
 
+### Git State
+
+Branch: main
+Phase 3 commit: pending (not yet committed)
+
 ## Session Continuity
 
 Last session: 2026-04-13
-Stopped at: Phase 2 complete — preprocessing optimization done
-Next action: Run /paul:plan to begin Phase 3 (Cold-Start UX)
-Resume file: .paul/phases/02-preprocessing-optimization/02-02-SUMMARY.md
+Stopped at: v1.1 milestone complete — all 3 phases unified
+Next action: Create git commit for Phase 3 changes, then deploy to Render + Vercel
+Resume file: .paul/ROADMAP.md
 
 ---
 *STATE.md — Updated after every significant action*

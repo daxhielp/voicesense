@@ -7,8 +7,8 @@ VoiceSense v1.0 is shipped. The roadmap now focuses on performance and infrastru
 ## Current Milestone
 
 **v1.1 Performance & Infrastructure**
-Status: In progress
-Phases: 0 of 3 complete
+Status: Complete
+Phases: 3 of 3 complete
 
 ## Phases
 
@@ -16,7 +16,7 @@ Phases: 0 of 3 complete
 |-------|------|-------|--------|-----------|
 | 1 | ONNX Conversion | 1 | Complete | 2026-04-13 |
 | 2 | Preprocessing Optimization | 2 | Complete | 2026-04-13 |
-| 3 | Cold-Start UX | 1 | Not started | - |
+| 3 | Cold-Start UX | 1 | Complete | 2026-04-13 |
 
 ## Phase Details
 
@@ -64,7 +64,7 @@ Phases: 0 of 3 complete
 - Retry logic for timeout errors with user-visible feedback
 
 **Plans:**
-- [ ] 03-01: Implement keep-alive + improved cold-start UX
+- [x] 03-01: Implement keep-alive + improved cold-start UX
 
 ---
 *Roadmap created: 2026-04-13*
