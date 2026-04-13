@@ -1,20 +1,18 @@
 """
 backend/inference.py
-Speech Emotion Recognition inference — loads emotion_model.pkl and exposes
-predict(audio_bytes, content_type) -> dict
+Speech Emotion Recognition inference — loads emotion_model.onnx via ONNX Runtime
+and exposes predict(audio_bytes, content_type) -> dict
 """
 from __future__ import annotations
 
 import io
 import logging
-import pickle
 from pathlib import Path
 
 import librosa
 import numpy as np
-import torch
-import torch.nn as nn
-import torch.nn.functional as F
+import onnxruntime as ort
+import scipy.ndimage
 
 logger = logging.getLogger(__name__)
 
@@ -44,131 +42,38 @@ EMOTION_META: dict[str, dict[str, str]] = {
 
 # ── Preprocessing constants (must match training exactly) ────────────────────
 SAMPLE_RATE = 22050
-DURATION    = 3                           # seconds
-TARGET_LEN  = SAMPLE_RATE * DURATION     # 66,150 samples
+DURATION    = 3                        # seconds
+TARGET_LEN  = SAMPLE_RATE * DURATION  # 66,150 samples
 N_MELS      = 128
 N_FFT       = 2048
 HOP_LENGTH  = 512
-IMG_SIZE    = (128, 128)                  # (H, W) fed to CNN
-NORM_FACTOR = 80.0                        # maps dB range [-80,0] → [-1,0]
+IMG_SIZE    = (128, 128)              # (H, W) fed to model
+NORM_FACTOR = 80.0                    # maps dB range [-80, 0] → [-1, 0]
 
-MODEL_PATH = Path(__file__).parent.parent / "model" / "emotion_model.pkl"
+MODEL_PATH = Path(__file__).parent.parent / "model" / "emotion_model.onnx"
 
 
-# ── CNN Architecture ─────────────────────────────────────────────────────────
-class EmotionCNN(nn.Module):
+# ── ONNX Runtime session (singleton) ─────────────────────────────────────────
+_session: ort.InferenceSession | None = None
+
+
+def load_model() -> ort.InferenceSession:
     """
-    Exact architecture used in week2_cnn.ipynb.
-    Input:  (batch, 1, 128, 128)
-    Output: (batch, 8)  — raw logits, no softmax
+    Load emotion_model.onnx once and cache the InferenceSession.
+    onnxruntime automatically resolves emotion_model.onnx.data from the same directory.
     """
+    global _session
+    if _session is not None:
+        return _session
 
-    def __init__(self, num_classes: int = 8) -> None:
-        super().__init__()
-        self.block1 = nn.Sequential(
-            nn.Conv2d(1, 32, kernel_size=3, padding=1),
-            nn.BatchNorm2d(32),
-            nn.ReLU(inplace=True),
-            nn.MaxPool2d(2),
-        )
-        self.block2 = nn.Sequential(
-            nn.Conv2d(32, 64, kernel_size=3, padding=1),
-            nn.BatchNorm2d(64),
-            nn.ReLU(inplace=True),
-            nn.MaxPool2d(2),
-        )
-        self.block3 = nn.Sequential(
-            nn.Conv2d(64, 128, kernel_size=3, padding=1),
-            nn.BatchNorm2d(128),
-            nn.ReLU(inplace=True),
-            nn.MaxPool2d(2),
-        )
-        self.classifier = nn.Sequential(
-            nn.Dropout(0.5),
-            nn.Linear(128 * 16 * 16, 256),
-            nn.ReLU(inplace=True),
-            nn.Linear(256, num_classes),
-        )
-
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        x = self.block1(x)
-        x = self.block2(x)
-        x = self.block3(x)
-        x = x.view(x.size(0), -1)
-        return self.classifier(x)
-
-
-# ── Model loading (singleton pattern) ────────────────────────────────────────
-_model: EmotionCNN | None = None
-
-
-def load_model() -> EmotionCNN:
-    """
-    Load emotion_model.pkl once and cache it.
-
-    Strategy:
-      1. torch.load() — handles both full model objects and state_dicts
-      2. If result is an OrderedDict (state_dict), instantiate EmotionCNN and load_state_dict
-      3. Fall back to pickle.load() if torch.load() raises
-    """
-    global _model
-    if _model is not None:
-        return _model
-
-    logger.info("Loading model from %s", MODEL_PATH)
-
-    obj = None
-
-    # The model was saved from a Jupyter notebook via torch.save(model, path),
-    # so pickle serialized EmotionCNN under __main__.EmotionCNN.  When loaded
-    # outside a notebook (e.g. from uvicorn) __main__ is a frozen built-in
-    # module and pickle can't resolve the class.  We temporarily replace
-    # sys.modules['__main__'] with a lightweight module that exposes
-    # EmotionCNN, then restore the original after deserialization.
-    import sys
-    import types
-
-    _orig_main = sys.modules.get("__main__")
-    _shim = types.ModuleType("__main__")
-    _shim.EmotionCNN = EmotionCNN  # type: ignore[attr-defined]
-    sys.modules["__main__"] = _shim
-    try:
-        obj = torch.load(
-            MODEL_PATH,
-            map_location=torch.device("cpu"),
-            weights_only=False,
-        )
-        logger.info("torch.load succeeded, type=%s", type(obj).__name__)
-    except Exception as e:
-        logger.warning("torch.load failed: %s", e)
-        obj = None
-    finally:
-        # Always restore the real __main__
-        if _orig_main is not None:
-            sys.modules["__main__"] = _orig_main
-        else:
-            sys.modules.pop("__main__", None)
-
-    if obj is None:
-        raise RuntimeError(
-            f"Cannot load model from {MODEL_PATH}. "
-            "Ensure emotion_model.pkl is a valid PyTorch model or state_dict."
-        )
-
-    # Determine if obj is a state_dict or a full model
-    if isinstance(obj, dict):
-        logger.info("Detected state_dict — instantiating EmotionCNN")
-        model = EmotionCNN(num_classes=8)
-        model.load_state_dict(obj)
-    elif isinstance(obj, nn.Module):
-        model = obj
-    else:
-        raise RuntimeError(f"Unknown model object type: {type(obj)}")
-
-    model.eval()
-    _model = model
-    logger.info("Model ready (eval mode)")
-    return _model
+    logger.info("Loading ONNX model from %s", MODEL_PATH)
+    _session = ort.InferenceSession(
+        str(MODEL_PATH),
+        providers=["CPUExecutionProvider"],
+    )
+    input_name = _session.get_inputs()[0].name
+    logger.info("ONNX session ready — input: %s %s", input_name, _session.get_inputs()[0].shape)
+    return _session
 
 
 # ── Audio preprocessing ───────────────────────────────────────────────────────
@@ -195,7 +100,7 @@ def _convert_to_wav_bytes(audio_bytes: bytes, content_type: str) -> bytes:
     return buf.getvalue()
 
 
-def preprocess_audio(audio_bytes: bytes, content_type: str) -> torch.Tensor:
+def preprocess_audio(audio_bytes: bytes, content_type: str) -> np.ndarray:
     """
     Full preprocessing pipeline matching RavdessSpectrogramDataset._preprocess():
 
@@ -203,11 +108,11 @@ def preprocess_audio(audio_bytes: bytes, content_type: str) -> torch.Tensor:
       2. librosa.load(sr=22050, mono=True)
       3. Pad/truncate to exactly 66,150 samples (3 s)
       4. Mel spectrogram (n_fft=2048, hop_length=512, n_mels=128) → dB
-      5. F.interpolate bilinear → (128, 128)
+      5. scipy.ndimage.zoom bilinear → (128, 128)
       6. Divide by 80 → [-1, 0] normalized
 
     Returns:
-        torch.Tensor of shape (1, 1, 128, 128) ready for model
+        np.ndarray of shape (1, 1, 128, 128), dtype float32, ready for ONNX session
     """
     wav_bytes = _convert_to_wav_bytes(audio_bytes, content_type)
 
@@ -229,12 +134,12 @@ def preprocess_audio(audio_bytes: bytes, content_type: str) -> torch.Tensor:
     )
     mel_db = librosa.power_to_db(mel, ref=np.max)
 
-    # Resize to (128, 128) with bilinear interpolation (matches training)
-    t = torch.from_numpy(mel_db).unsqueeze(0).unsqueeze(0).float()  # (1, 1, H, W)
-    t = F.interpolate(t, size=IMG_SIZE, mode="bilinear", align_corners=False)
+    # Bilinear resize to (128, 128) — scipy order=1 matches PyTorch bilinear for this range
+    h, w = mel_db.shape
+    mel_resized = scipy.ndimage.zoom(mel_db, (IMG_SIZE[0] / h, IMG_SIZE[1] / w), order=1)
 
-    # Normalize: dB range [-80, 0] → [-1, 0]
-    t = t / NORM_FACTOR
+    # Normalize: dB range [-80, 0] → [-1, 0]; add batch + channel dims
+    t = mel_resized[np.newaxis, np.newaxis, :, :].astype(np.float32) / NORM_FACTOR
 
     return t  # shape (1, 1, 128, 128)
 
@@ -257,19 +162,22 @@ def predict(audio_bytes: bytes, content_type: str) -> dict:
             "emoji": "😄"
         }
     """
-    model = load_model()
-    tensor = preprocess_audio(audio_bytes, content_type)
+    session = load_model()
+    tensor  = preprocess_audio(audio_bytes, content_type)  # (1, 1, 128, 128) float32
 
-    with torch.no_grad():
-        logits = model(tensor)                              # (1, 8) raw logits
-        probs  = torch.softmax(logits, dim=1).squeeze()    # (8,)
+    input_name = session.get_inputs()[0].name
+    logits = session.run(None, {input_name: tensor})[0]  # (1, 8) float32
 
-    probs_np  = probs.numpy()
-    pred_idx  = int(probs_np.argmax())
+    # Numerically stable softmax
+    logits = logits.squeeze()          # (8,)
+    exp_l  = np.exp(logits - logits.max())
+    probs  = exp_l / exp_l.sum()      # (8,)
+
+    pred_idx  = int(probs.argmax())
     pred_name = EMOTION_LABELS[pred_idx]
 
     probabilities = {
-        EMOTION_LABELS[i]: round(float(probs_np[i]) * 100, 2)
+        EMOTION_LABELS[i]: round(float(probs[i]) * 100, 2)
         for i in range(8)
     }
     probabilities_sorted = dict(
@@ -278,7 +186,7 @@ def predict(audio_bytes: bytes, content_type: str) -> dict:
 
     return {
         "emotion":       pred_name,
-        "confidence":    round(float(probs_np[pred_idx]) * 100, 2),
+        "confidence":    round(float(probs[pred_idx]) * 100, 2),
         "probabilities": probabilities_sorted,
         "color":         EMOTION_META[pred_name]["color"],
         "emoji":         EMOTION_META[pred_name]["emoji"],

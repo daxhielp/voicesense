@@ -10,13 +10,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 WORKDIR /app
 
-# Install CPU-only PyTorch first (separate step for Docker layer caching)
-# CPU wheel is ~200 MB vs ~900 MB for CUDA — critical for Render free tier
-RUN pip install --no-cache-dir \
-    torch==2.11.0 \
-    --index-url https://download.pytorch.org/whl/cpu
-
-# Copy and install remaining Python deps
+# Install Python deps (no torch — replaced by onnxruntime ~8 MB)
 COPY backend/requirements.txt .
 RUN pip install --no-cache-dir \
     fastapi==0.135.3 \
@@ -25,14 +19,17 @@ RUN pip install --no-cache-dir \
     pydub==0.25.1 \
     "librosa==0.11.0" \
     "numpy==2.4.4" \
-    "scipy==1.17.1"
+    "scipy==1.17.1" \
+    "onnxruntime==1.21.0"
 
 # Copy backend source files
 COPY backend/main.py .
 COPY backend/inference.py .
 
-# Copy model file (path relative to build context = voiceSense/)
-COPY model/emotion_model.pkl /model/emotion_model.pkl
+# Copy ONNX model (external data format: .onnx graph + .onnx.data weights)
+# Both files must be in the same directory for onnxruntime to resolve weights
+COPY model/emotion_model.onnx /model/emotion_model.onnx
+COPY model/emotion_model.onnx.data /model/emotion_model.onnx.data
 
 # Render injects PORT; default to 8000
 ENV PORT=8000

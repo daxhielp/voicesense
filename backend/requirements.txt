@@ -5,6 +5,4 @@ pydub==0.25.1
 librosa==0.11.0
 numpy==2.4.4
 scipy==1.17.1
-# torch CPU-only — installed separately in Dockerfile via --index-url
-# to avoid pulling in the full CUDA wheel (~900 MB → ~200 MB with CPU only)
-torch==2.11.0
+onnxruntime==1.21.0
