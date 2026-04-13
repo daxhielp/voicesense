@@ -9,10 +9,14 @@ import io
 import logging
 from pathlib import Path
 
+import soundfile as sf
+from math import gcd
+
 import librosa
 import numpy as np
 import onnxruntime as ort
 import scipy.ndimage
+import scipy.signal
 
 logger = logging.getLogger(__name__)
 
@@ -116,7 +120,19 @@ def preprocess_audio(audio_bytes: bytes, content_type: str) -> np.ndarray:
     """
     wav_bytes = _convert_to_wav_bytes(audio_bytes, content_type)
 
-    y, _ = librosa.load(io.BytesIO(wav_bytes), sr=SAMPLE_RATE, mono=True)
+    # Decode WAV with soundfile (fast — no resampling at this stage)
+    y_raw, native_sr = sf.read(io.BytesIO(wav_bytes), dtype="float32", always_2d=False)
+
+    # Convert stereo → mono if needed
+    if y_raw.ndim > 1:
+        y_raw = y_raw.mean(axis=1)
+
+    # Resample to SAMPLE_RATE (22050 Hz) via polyphase filter if needed
+    if native_sr != SAMPLE_RATE:
+        g = gcd(native_sr, SAMPLE_RATE)
+        y = scipy.signal.resample_poly(y_raw, SAMPLE_RATE // g, native_sr // g)
+    else:
+        y = y_raw
 
     # Pad or truncate to exactly TARGET_LEN samples
     if len(y) < TARGET_LEN:

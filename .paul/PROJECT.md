@@ -47,10 +47,11 @@ None.
 
 - [x] ONNX model export + onnxruntime inference — v1.1 (torch removed from Docker, ~150 MB saved)
 
+- [x] Preprocessing optimization (soundfile + resample_poly) — v1.1 (librosa.load: 28s → 3.5ms; total: 24x faster)
+
 ### Planned (Next)
 
-- [ ] Preprocessing bottleneck investigation — ffmpeg + librosa is the slow step (~2m13s on Render free tier)
-- [ ] Cold-start UX improvement — loading state, retry logic, or keep-alive ping
+- [ ] Cold-start UX improvement — keep-alive ping, "warming up..." loading state, retry logic
 
 ### Out of Scope
 

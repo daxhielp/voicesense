@@ -15,7 +15,7 @@ Phases: 0 of 3 complete
 | Phase | Name | Plans | Status | Completed |
 |-------|------|-------|--------|-----------|
 | 1 | ONNX Conversion | 1 | Complete | 2026-04-13 |
-| 2 | Preprocessing Optimization | 2 | Not started | - |
+| 2 | Preprocessing Optimization | 2 | Complete | 2026-04-13 |
 | 3 | Cold-Start UX | 1 | Not started | - |
 
 ## Phase Details
@@ -49,8 +49,8 @@ Phases: 0 of 3 complete
 - Implement fastest viable pipeline
 
 **Plans:**
-- [ ] 02-01: Profile preprocessing steps, identify dominant bottleneck
-- [ ] 02-02: Implement optimized preprocessing pipeline
+- [x] 02-01: Profile preprocessing — identified librosa.load() resampling as 94.5% bottleneck
+- [x] 02-02: Replace with soundfile + resample_poly — step 2: 28,000ms → 3.5ms, total: 24x faster
 
 ### Phase 3: Cold-Start UX
 
