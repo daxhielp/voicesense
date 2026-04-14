@@ -71,10 +71,7 @@ export function IdleView({ onStart, error }: Props) {
           Tap to start recording
         </p>
         <p className="text-slate-600 text-xs">
-          Speak naturally for up to 10 seconds
-        </p>
-        <p className="text-slate-700 text-xs">
-          Detects neutral · calm · happy · sad · angry · fearful · disgust · surprised
+          Speak for up to 10 seconds
         </p>
       </div>
 

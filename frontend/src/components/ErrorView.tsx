@@ -14,7 +14,6 @@ export function ErrorView({ message, onRetry }: Props) {
       exit={{ opacity: 0, y: -10 }}
       transition={{ duration: 0.3 }}
     >
-      <div className="text-4xl">⚠️</div>
       <p className="text-slate-300 text-sm leading-relaxed max-w-xs">{message}</p>
       <motion.button
         className="px-6 py-2.5 rounded-xl bg-violet-600 hover:bg-violet-500
@@ -23,7 +22,7 @@ export function ErrorView({ message, onRetry }: Props) {
         whileTap={{ scale: 0.96 }}
         onClick={onRetry}
       >
-        Try Again
+        Start again
       </motion.button>
     </motion.div>
   )

@@ -11,7 +11,11 @@
       "Bash(npm show:*)",
       "Bash(pip index:*)",
       "Bash(pip show:*)",
-      "Bash(python -c \"import urllib.request, json; data=json.loads\\(urllib.request.urlopen\\('https://pypi.org/pypi/librosa/0.11.0/json'\\).read\\(\\)\\); notes=data['info']['description'][:3000]; print\\(notes\\)\")"
+      "Bash(python -c \"import urllib.request, json; data=json.loads\\(urllib.request.urlopen\\('https://pypi.org/pypi/librosa/0.11.0/json'\\).read\\(\\)\\); notes=data['info']['description'][:3000]; print\\(notes\\)\")",
+      "Bash(npx tsc:*)",
+      "Bash(node_modules/.bin/tsc --noEmit)",
+      "Bash(node_modules/.bin/vite build:*)",
+      "Bash(cmd /c \"dir node_modules\\\\.bin\\\\tsc* 2>&1\")"
     ]
   }
 }

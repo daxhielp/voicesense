@@ -171,7 +171,7 @@ export default function App() {
           transition={{ delay: 0.9 }}
         >
           <p className="text-xs text-slate-700">
-            Trained on RAVDESS · 8 emotions · CNN + mel spectrogram
+            Detect from 8 emotions · CNN + mel spectrogram model
           </p>
           <p className="text-xs text-slate-800">
             FastAPI · React · Tailwind · Framer Motion

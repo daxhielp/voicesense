@@ -53,7 +53,7 @@ None.
 ### Git State
 
 Branch: main
-Phase 3 commit: pending (not yet committed)
+Phase 3 commit: 43b477d (feat(03-cold-start-ux): cold-start UX)
 
 ## Session Continuity
 
