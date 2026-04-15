@@ -2,7 +2,7 @@
 
 > Record your voice in the browser and get a real-time emotion prediction powered by a deep learning model trained on the RAVDESS dataset.
 
-**Live demo:** `https://voicesense-beryl.vercel.app/` *(deploy to activate)*
+**Live demo:** `https://voicesense-beryl.vercel.app/` 
 
 ---
 
